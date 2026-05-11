@@ -19,7 +19,6 @@ export async function GET(
           visibility: 'PUBLIC',
         },
         include: {
-          owner: { select: { id: true, name: true, image: true } },
           sourceSegment: {
             select: { id: true, title: true, content: true },
           },
@@ -45,7 +44,6 @@ export async function GET(
         sourceSegmentId: f.sourceSegmentId,
         sourceSegmentTitle: f.sourceSegment.title,
         sourceSegmentPreview: f.sourceSegment.content?.slice(0, 100),
-        owner: f.owner,
         createdAt: f.createdAt,
         updatedAt: f.updatedAt,
         likeCount: f._count.likes,

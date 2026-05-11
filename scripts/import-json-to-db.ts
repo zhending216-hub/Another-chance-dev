@@ -25,19 +25,10 @@ const pool = new pg.Pool({
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-const SYSTEM_USER_ID = "system";
-
 async function main() {
   console.log("开始导入 JSON 数据到 PostgreSQL...");
 
-  // 1. 确保 system 用户存在
-  const systemUser = await prisma.user.findUnique({ where: { id: SYSTEM_USER_ID } });
-  if (!systemUser) {
-    console.error("  [ERROR] system 用户不存在，请先运行 seed");
-    process.exit(1);
-  }
-
-  // 2. 导入故事
+  // 1. 导入故事
   const stories = loadJSON<any>("stories.json");
   console.log(`  导入 ${stories.length} 个故事...`);
   let storyCount = 0;
@@ -52,7 +43,6 @@ async function main() {
           era: s.era || null,
           genre: s.genre || null,
           visibility: "PUBLIC",
-          ownerId: SYSTEM_USER_ID,
           ...(s.rootSegmentId ? { rootSegmentId: null } : {}), // 先不设，后面更新
           ...(s.createdAt ? { createdAt: new Date(s.createdAt) } : {}),
           ...(s.updatedAt ? { updatedAt: new Date(s.updatedAt) } : {}),
@@ -66,7 +56,6 @@ async function main() {
           genre: s.genre || null,
           storyType: s.storyType || null,
           visibility: "PUBLIC",
-          ownerId: SYSTEM_USER_ID,
           ...(s.createdAt ? { createdAt: new Date(s.createdAt) } : {}),
           ...(s.updatedAt ? { updatedAt: new Date(s.updatedAt) } : {}),
         },
@@ -78,7 +67,7 @@ async function main() {
   }
   console.log(`  [OK] ${storyCount}/${stories.length} 个故事已导入`);
 
-  // 3. 导入段落
+  // 2. 导入段落
   const segments = loadJSON<any>("segments.json");
   console.log(`  导入 ${segments.length} 个段落...`);
   let segCount = 0;
@@ -135,7 +124,7 @@ async function main() {
   }
   console.log(`  [OK] ${segCount}/${segments.length} 个段落已导入`);
 
-  // 4. 更新故事的 rootSegmentId
+  // 3. 更新故事的 rootSegmentId
   console.log("  更新故事的 rootSegmentId...");
   for (const s of stories) {
     if (s.rootSegmentId) {
@@ -154,7 +143,7 @@ async function main() {
   }
   console.log("  [OK] rootSegmentId 已更新");
 
-  // 5. 导入分支
+  // 4. 导入分支
   const branches = loadJSON<any>("branches.json");
   console.log(`  导入 ${branches.length} 个分支...`);
   let branchCount = 0;
@@ -180,7 +169,6 @@ async function main() {
           characterStateSnapshot: b.characterStateSnapshot || undefined,
           forkTimeline: b.forkTimeline || undefined,
           visibility: "PUBLIC",
-          ownerId: SYSTEM_USER_ID,
           ...(b.createdAt ? { createdAt: new Date(b.createdAt) } : {}),
           ...(b.updatedAt ? { updatedAt: new Date(b.updatedAt) } : {}),
         },
@@ -194,7 +182,6 @@ async function main() {
           characterStateSnapshot: b.characterStateSnapshot || undefined,
           forkTimeline: b.forkTimeline || undefined,
           visibility: "PUBLIC",
-          ownerId: SYSTEM_USER_ID,
           ...(b.createdAt ? { createdAt: new Date(b.createdAt) } : {}),
           ...(b.updatedAt ? { updatedAt: new Date(b.updatedAt) } : {}),
         },
@@ -206,7 +193,7 @@ async function main() {
   }
   console.log(`  [OK] ${branchCount}/${branches.length} 个分支已导入`);
 
-  // 6. 导入角色（通过 stories.json 的 characterIds 反查 storyId）
+  // 5. 导入角色（通过 stories.json 的 characterIds 反查 storyId）
   const characters = loadJSON<any>("characters.json");
   // 构建 characterId -> storyId 映射
   const charStoryMap = new Map<string, string>();

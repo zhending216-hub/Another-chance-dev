@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getUserIdFromRequest } from '@/lib/auth-helpers';
 
 // GET /api/stories/[id]/comments — List top-level comments with replies
 export async function GET(
@@ -17,7 +16,6 @@ export async function GET(
     const allComments = await prisma.comment.findMany({
       where: { storyId },
       include: {
-        user: { select: { id: true, name: true, image: true } },
         _count: { select: { likes: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -42,25 +40,9 @@ export async function GET(
     const total = roots.length;
     const paginatedRoots = roots.slice((page - 1) * limit, page * limit);
 
-    // Get current user's likes on these comments
-    const userId = await getUserIdFromRequest(request);
-    let likedCommentIds = new Set<string>();
-    if (userId) {
-      const allCommentIds = collectCommentIds(paginatedRoots);
-      if (allCommentIds.length > 0) {
-        const likes = await prisma.commentLike.findMany({
-          where: { userId, commentId: { in: allCommentIds } },
-          select: { commentId: true },
-        });
-        likedCommentIds = new Set(likes.map(l => l.commentId));
-      }
-    }
-
-    const commentsWithLiked = userId ? markLiked(paginatedRoots, likedCommentIds) : paginatedRoots;
-
     return NextResponse.json({
       success: true,
-      comments: commentsWithLiked,
+      comments: paginatedRoots,
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (error) {
@@ -75,9 +57,6 @@ export async function POST(
   { params }: { params: { id: string } },
 ) {
   try {
-    const userId = await getUserIdFromRequest(request);
-    if (!userId) return NextResponse.json({ error: '请先登录' }, { status: 401 });
-
     const { id: storyId } = params;
     const { content, parentId } = await request.json();
 
@@ -103,12 +82,8 @@ export async function POST(
     const comment = await prisma.comment.create({
       data: {
         content: content.trim(),
-        userId,
         storyId,
         parentId: parentId || null,
-      },
-      include: {
-        user: { select: { id: true, name: true, image: true } },
       },
     });
 
@@ -127,13 +102,4 @@ function collectCommentIds(comments: any[]): string[] {
     if (c.replies?.length) ids.push(...collectCommentIds(c.replies));
   }
   return ids;
-}
-
-// Helper: mark liked status on nested comments
-function markLiked(comments: any[], likedIds: Set<string>): any[] {
-  return comments.map(c => ({
-    ...c,
-    liked: likedIds.has(c.id),
-    replies: c.replies?.length ? markLiked(c.replies, likedIds) : c.replies,
-  }));
 }

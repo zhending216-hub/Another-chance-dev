@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useSession } from 'next-auth/react';
 
 interface CommentFormProps {
   onSubmit: (content: string, parentId?: string) => Promise<void>;
@@ -12,7 +11,6 @@ interface CommentFormProps {
 }
 
 export default function CommentForm({ onSubmit, placeholder = '写下你的评论...', parentId, replyTo, onCancel }: CommentFormProps) {
-  const { data: session } = useSession();
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -27,14 +25,6 @@ export default function CommentForm({ onSubmit, placeholder = '写下你的评�
     } catch {}
     setSubmitting(false);
   };
-
-  if (!session) {
-    return (
-      <div className="text-sm text-[var(--muted)] py-3 text-center border border-dashed border-[var(--border)] rounded-lg">
-        登录后可以发表评论
-      </div>
-    );
-  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-2">

@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getUserIdFromRequest } from '@/lib/auth-helpers';
-import { canViewStory } from '@/lib/permissions';
 import { storiesStore } from '@/lib/simple-db';
 
 import { characterManager } from '@/lib/character-engine';
@@ -10,25 +8,10 @@ import { triggerBackup } from '@/lib/auto-backup';
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = await getUserIdFromRequest(request);
     const { searchParams } = new URL(request.url);
     const feed = searchParams.get('feed');
 
-    let where: any = {};
-
-    if (feed === 'public') {
-      where.visibility = 'PUBLIC';
-    } else if (userId) {
-      where = {
-        OR: [
-          { ownerId: userId },
-          { visibility: 'PUBLIC' },
-          { visibility: 'UNLISTED' },
-        ],
-      };
-    } else {
-      where.visibility = 'PUBLIC';
-    }
+    let where: any = { visibility: 'PUBLIC' };
 
     let stories: any[];
     try {
@@ -37,7 +20,6 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: 'desc' },
         include: {
           _count: { select: { segments: true, likes: true, comments: true, branches: true } },
-          owner: { select: { id: true, name: true, image: true } },
         },
       });
     } catch (dbError) {
@@ -49,37 +31,13 @@ export async function GET(request: NextRequest) {
         .map((s: any) => ({
           ...s,
           _count: { segments: 0, likes: 0, comments: 0, branches: 0 },
-          owner: null,
           visibility: 'PUBLIC',
         }));
     }
 
-    // Add isLiked for each story if user is logged in
-    let storiesWithLikeStatus: any[];
-    if (userId && stories.length > 0) {
-      try {
-        storiesWithLikeStatus = await Promise.all(
-          stories.map(async (s: any) => {
-            try {
-              const like = await prisma.storyLike.findUnique({
-                where: { userId_storyId: { userId, storyId: s.id } },
-              });
-              return { ...s, isLiked: !!like };
-            } catch {
-              return { ...s, isLiked: false };
-            }
-          })
-        );
-      } catch {
-        storiesWithLikeStatus = stories.map((s: any) => ({ ...s, isLiked: false }));
-      }
-    } else {
-      storiesWithLikeStatus = stories;
-    }
-
     return NextResponse.json({
       success: true,
-      stories: storiesWithLikeStatus,
+      stories,
       total: stories.length,
     });
   } catch (error) {
@@ -93,11 +51,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = await getUserIdFromRequest(request);
-    if (!userId) {
-      return NextResponse.json({ error: '请先登录' }, { status: 401 });
-    }
-
     const body = await request.json();
     const { title, description, author, genre, era, storyType, characters } = body;
 
@@ -108,7 +61,7 @@ export async function POST(request: NextRequest) {
     const effectiveGenre = genre || undefined; // genre only stores sub-genre label
 
     const existing = await prisma.story.findFirst({
-      where: { title, ownerId: userId },
+      where: { title },
     });
     if (existing) {
       return NextResponse.json({
@@ -126,8 +79,7 @@ export async function POST(request: NextRequest) {
         genre: effectiveGenre,
         storyType: storyType || undefined,
         era,
-        ownerId: userId,
-        visibility: 'PRIVATE',
+        visibility: 'PUBLIC',
       },
     });
 
@@ -140,7 +92,7 @@ export async function POST(request: NextRequest) {
         branchId: 'main',
         parentSegmentId: null,
         imageUrls: [],
-        visibility: 'PRIVATE',
+        visibility: 'PUBLIC',
       },
     });
 
@@ -155,7 +107,7 @@ export async function POST(request: NextRequest) {
       for (const char of characters) {
         if (!char.name || !char.name.trim()) continue;
         // 过滤非中文名
-        if (!/[\u4e00-\u9fff]/.test(char.name)) continue;
+        if (!/[一-鿿]/.test(char.name)) continue;
         try {
           const traits: string[] = [];
           if (Array.isArray(char.traits)) {

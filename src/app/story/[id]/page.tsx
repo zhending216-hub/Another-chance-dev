@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
-import { useSession } from 'next-auth/react';
 import CharacterPanel from '@/components/CharacterPanel';
 import TimelineBar from '@/components/TimelineBar';
 import DirectorSidebar from '@/components/DirectorSidebar';
 import PacingControls from '@/components/PacingControls';
 import StoryImageDisplay from '@/components/story/StoryImageDisplay';
+import AutoContinuePanel from '@/components/AutoContinuePanel';
 import { IMAGE_STYLES, type ImageStyle, type ConcreteImageStyle } from '@/lib/image-styles';
 import type { PacingConfig, Character, StorySegment, StoryBranch } from '@/types/story';
 import { getStaticBranchDirections } from '@/lib/genre-config';
@@ -33,7 +33,6 @@ interface Story {
 
 export default function StoryDetailPage({ params }: { params: { id: string } }) {
   const { id } = params;
-  const { data: session } = useSession();
   const [story, setStory] = useState<Story | null>(null);
   const [segments, setSegments] = useState<StorySegment[]>([]);
   const [branches, setBranches] = useState<StoryBranch[]>([]);
@@ -75,8 +74,8 @@ export default function StoryDetailPage({ params }: { params: { id: string } }) 
   const [regeneratingImageForSeg, setRegeneratingImageForSeg] = useState<string | null>(null);
   const [imageStyle, setImageStyle] = useState<ImageStyle>('ink-wash');
   const [styleRecommendation, setStyleRecommendation] = useState<{style: string, reason: string} | null>(null);
-
-  const isOwner = !!session?.user?.id && story?.ownerId === session.user.id;
+  // 自动续写
+  const [showAutoContinue, setShowAutoContinue] = useState(false);
 
   const loadBranchSegments = useCallback(async (branchId: string) => {
     const segRes = await fetch(`/api/stories/${id}/segments?branchId=${branchId}`);
@@ -614,13 +613,11 @@ export default function StoryDetailPage({ params }: { params: { id: string } }) 
               </div>
             </div>
             <h1 className="text-sm font-bold text-[var(--ink)] tracking-wider">{story.title}</h1>
-            {isOwner && (
-              <button
-                onClick={() => setShowEditModal(true)}
-                className="p-1.5 rounded-lg text-xs text-[var(--muted)] hover:bg-gray-100 transition-all"
-                title="编辑故事信息"
-              >✏️</button>
-            )}
+            <button
+              onClick={() => setShowEditModal(true)}
+              className="p-1.5 rounded-lg text-xs text-[var(--muted)] hover:bg-gray-100 transition-all"
+              title="编辑故事信息"
+            >✏️</button>
           </div>
         </div>
       </nav>
@@ -698,26 +695,24 @@ export default function StoryDetailPage({ params }: { params: { id: string } }) 
         {/* Social actions bar */}
         <div className="flex items-center justify-center gap-4 mt-4">
           <LikeButton targetId={id} type="story" initialLiked={story.isLiked || false} initialCount={story.likeCount || 0} />
-          {isOwner && (
-            <VisibilityToggle
-              currentVisibility={(story as any).visibility || 'PRIVATE'}
-              on_change={async (v) => {
-                const res = await fetch(`/api/stories/${id}`, {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ ...editForm, visibility: v }),
-                });
-                if (res.ok) {
-                  const data = await res.json();
-                  setStory(data.story);
-                  setEditForm((f: any) => ({ ...f, visibility: v }));
-                } else {
-                  const err = await res.json().catch(() => ({}));
-                  alert(err.error || '修改可见性失败');
-                }
-              }}
-            />
-          )}
+          <VisibilityToggle
+            currentVisibility={(story as any).visibility || 'PRIVATE'}
+            on_change={async (v) => {
+              const res = await fetch(`/api/stories/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...editForm, visibility: v }),
+              });
+              if (res.ok) {
+                const data = await res.json();
+                setStory(data.story);
+                setEditForm((f: any) => ({ ...f, visibility: v }));
+              } else {
+                const err = await res.json().catch(() => ({}));
+                alert(err.error || '修改可见性失败');
+              }
+            }}
+          />
         </div>
       </div>
 
@@ -933,21 +928,29 @@ export default function StoryDetailPage({ params }: { params: { id: string } }) 
             {segments.length > 0 && (
               <div className="mt-6 text-center">
                 <div className="divider-ornament mb-6"><span>✦</span></div>
-                <button
-                  onClick={handleContinue}
-                  disabled={continuing}
-                  className={`inline-flex items-center gap-2 px-8 py-3 rounded-full font-medium transition-all ${
-                    continuing
-                      ? 'bg-gray-200 text-[var(--muted)] cursor-wait'
-                      : 'bg-gradient-to-r from-amber-700 to-red-800 text-white hover:shadow-lg hover:shadow-amber-900/20'
-                  }`}
-                >
-                  {continuing ? (
-                    <><span className="inline-block w-4 h-4 border-2 border-[var(--muted)] border-t-transparent rounded-full animate-spin" />故事书写中...</>
-                  ) : (
-                    <>✦ 续写故事</>
-                  )}
-                </button>
+                <div className="flex items-center justify-center gap-3 flex-wrap">
+                  <button
+                    onClick={handleContinue}
+                    disabled={continuing}
+                    className={`inline-flex items-center gap-2 px-8 py-3 rounded-full font-medium transition-all ${
+                      continuing
+                        ? 'bg-gray-200 text-[var(--muted)] cursor-wait'
+                        : 'bg-gradient-to-r from-amber-700 to-red-800 text-white hover:shadow-lg hover:shadow-amber-900/20'
+                    }`}
+                  >
+                    {continuing ? (
+                      <><span className="inline-block w-4 h-4 border-2 border-[var(--muted)] border-t-transparent rounded-full animate-spin" />故事书写中...</>
+                    ) : (
+                      <>✦ 续写故事</>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setShowAutoContinue(true)}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-medium bg-gradient-to-r from-blue-600 to-indigo-700 text-white hover:shadow-lg hover:shadow-blue-900/20 transition-all"
+                  >
+                    🔄 自动续写
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -970,13 +973,30 @@ export default function StoryDetailPage({ params }: { params: { id: string } }) 
 
       {showBranchDialog && branchDialog}
 
+      {/* 自动续写弹窗 */}
+      {showAutoContinue && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowAutoContinue(false)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <AutoContinuePanel
+              storyId={id}
+              branchId={currentBranchId}
+              onComplete={() => {
+                setShowAutoContinue(false);
+                loadBranchSegments(currentBranchId);
+                loadTree();
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* 评论区 */}
       <div className="max-w-3xl mx-auto px-6">
         <CommentSection storyId={id} branchId={currentBranchId !== 'main' ? currentBranchId : undefined} />
       </div>
 
       {/* 编辑故事信息弹窗 */}
-      {isOwner && showEditModal && (
+      {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowEditModal(false)}>
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h2 className="text-lg font-bold text-[var(--ink)] mb-4">编辑故事信息</h2>

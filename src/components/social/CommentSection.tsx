@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useSession } from 'next-auth/react';
 import CommentForm from './CommentForm';
 import CommentItem from './CommentItem';
 
@@ -11,7 +10,6 @@ interface CommentSectionProps {
 }
 
 export default function CommentSection({ storyId, branchId }: CommentSectionProps) {
-  const { data: session } = useSession();
   const [comments, setComments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);

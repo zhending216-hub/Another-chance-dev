@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getUserIdFromRequest } from '@/lib/auth-helpers';
-import { canViewStory, canEditStory, canDeleteStory } from '@/lib/permissions';
 import { triggerBackup } from '@/lib/auto-backup';
 
 export async function GET(
@@ -9,33 +7,21 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   try {
-    const userId = await getUserIdFromRequest(request);
     const story = await prisma.story.findUnique({ where: { id: params.id } });
 
     if (!story) {
       return NextResponse.json({ error: '故事不存在' }, { status: 404 });
     }
 
-    if (!canViewStory(story, userId ?? undefined)) {
-      return NextResponse.json({ error: '无权查看' }, { status: 403 });
-    }
-
-    // Fetch like count and user's like status
-    const [likeCount, myLike] = await Promise.all([
-      prisma.storyLike.count({ where: { storyId: params.id } }),
-      userId
-        ? prisma.storyLike.findUnique({
-            where: { userId_storyId: { userId, storyId: params.id } },
-          })
-        : null,
-    ]);
+    // Fetch like count
+    const likeCount = await prisma.storyLike.count({ where: { storyId: params.id } });
 
     return NextResponse.json({
       success: true,
       story: {
         ...story,
         likeCount,
-        isLiked: !!myLike,
+        isLiked: false,
       },
     });
   } catch (error) {
@@ -48,18 +34,9 @@ export async function PATCH(
   { params }: { params: { id: string } },
 ) {
   try {
-    const userId = await getUserIdFromRequest(request);
-    if (!userId) {
-      return NextResponse.json({ error: '请先登录' }, { status: 401 });
-    }
-
     const story = await prisma.story.findUnique({ where: { id: params.id } });
     if (!story) {
       return NextResponse.json({ error: '故事不存在' }, { status: 404 });
-    }
-
-    if (!canEditStory(story, userId)) {
-      return NextResponse.json({ error: '无权编辑' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -98,19 +75,9 @@ export async function DELETE(
   { params }: { params: { id: string } },
 ) {
   try {
-    const userId = await getUserIdFromRequest(request);
-    if (!userId) {
-      return NextResponse.json({ error: '请先登录' }, { status: 401 });
-    }
-
     const story = await prisma.story.findUnique({ where: { id: params.id } });
     if (!story) {
       return NextResponse.json({ error: '故事不存在' }, { status: 404 });
-    }
-
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!canDeleteStory(story, user ? { id: user.id, isAdmin: user.isAdmin } : null)) {
-      return NextResponse.json({ error: '无权删除' }, { status: 403 });
     }
 
     // Cascade delete via Prisma (segments, branches, characters, director states)

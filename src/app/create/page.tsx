@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useSession } from 'next-auth/react';
 
 const storyTemplates = [
   {
@@ -122,7 +121,6 @@ interface InitialCharacter {
 
 export default function CreateStoryPage() {
   const router = useRouter();
-  const { data: session, status: sessionStatus } = useSession();
   const [tab, setTab] = useState<'template' | 'custom'>('template');
   const [storyType, setStoryType] = useState('history');
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
@@ -139,21 +137,6 @@ export default function CreateStoryPage() {
     { name: '', role: 'protagonist', traits: '' },
   ]);
   const [showEraPicker, setShowEraPicker] = useState(false);
-
-  // Auth guard
-  if (sessionStatus === 'loading') {
-    return <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--paper)' }}><p className="text-[var(--muted)]">加载中...</p></div>;
-  }
-  if (!session) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--paper)' }}>
-        <div className="text-center">
-          <p className="text-[var(--muted)] mb-4">请先登录后再创建故事</p>
-          <Link href="/login" className="text-[var(--gold)] hover:underline">前往登录 →</Link>
-        </div>
-      </div>
-    );
-  }
 
   const handleTemplateCreate = async () => {
     if (!selectedTemplate || !selectedPrompt || creating) return;

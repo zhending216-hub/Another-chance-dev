@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getUserIdFromRequest } from '@/lib/auth-helpers';
-import { canViewStory } from '@/lib/permissions';
 import { timelineEngine, buildTimelinePrompt } from '@/lib/timeline-engine';
 import { lorebook } from '@/lib/lorebook';
 
@@ -10,7 +8,6 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   try {
-    const userId = await getUserIdFromRequest(request);
     const storyId = params.id;
     const { searchParams } = new URL(request.url);
     const branchId = searchParams.get('branch') || 'main';
@@ -19,10 +16,6 @@ export async function GET(
 
     const story = await prisma.story.findUnique({ where: { id: storyId } });
     if (!story) return NextResponse.json({ error: '故事不存在' }, { status: 404 });
-
-    if (!canViewStory(story, userId ?? undefined)) {
-      return NextResponse.json({ error: '无权查看' }, { status: 403 });
-    }
 
     const timeline = await timelineEngine.getTimeline(storyId, branchId);
     const violations = await timelineEngine.validateTimeline(storyId, branchId);
@@ -64,17 +57,12 @@ export async function POST(
   { params }: { params: { id: string } },
 ) {
   try {
-    const userId = await getUserIdFromRequest(request);
     const storyId = params.id;
     const body = await request.json();
     const branchId = body.branch || 'main';
 
     const story = await prisma.story.findUnique({ where: { id: storyId } });
     if (!story) return NextResponse.json({ error: '故事不存在' }, { status: 404 });
-
-    if (!canViewStory(story, userId ?? undefined)) {
-      return NextResponse.json({ error: '无权查看' }, { status: 403 });
-    }
 
     const violations = await timelineEngine.validateTimeline(storyId, branchId);
 

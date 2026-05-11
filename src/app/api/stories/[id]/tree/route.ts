@@ -1,23 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getUserIdFromRequest } from '@/lib/auth-helpers';
-import { canViewStory, canViewBranch } from '@/lib/permissions';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
   try {
-    const userId = await getUserIdFromRequest(request);
     const { id: storyId } = params;
 
     const story = await prisma.story.findUnique({ where: { id: storyId } });
     if (!story) {
       return NextResponse.json({ error: '故事不存在' }, { status: 404 });
-    }
-
-    if (!canViewStory(story, userId ?? undefined)) {
-      return NextResponse.json({ error: '无权查看' }, { status: 403 });
     }
 
     const segments = await prisma.storySegment.findMany({
@@ -29,20 +22,8 @@ export async function GET(
       where: { storyId },
     });
 
-    // Filter branches by visibility
-    const visibleBranches = branches.filter((b) =>
-      canViewBranch(b, story, userId ?? undefined),
-    );
-
-    // Filter segments: only include segments from visible branches
-    const visibleBranchIds = new Set(visibleBranches.map((b) => b.id));
-    const visibleSegments = segments.filter((s) => {
-      if (s.branchId === 'main') return true;
-      return visibleBranchIds.has(s.branchId);
-    });
-
     // Build main line chain
-    const mainSegs = visibleSegments.filter((s) => s.branchId === 'main');
+    const mainSegs = segments.filter((s) => s.branchId === 'main');
     const mainLine: any[] = [];
     const mainSegMap = new Map(mainSegs.map((s) => [s.id, s]));
     const rootSeg = mainSegs.find((s) => !s.parentSegmentId);
@@ -58,11 +39,11 @@ export async function GET(
     }
 
     // Attach branches to main line nodes
-    for (const branch of visibleBranches) {
+    for (const branch of branches) {
       const sourceIdx = mainLine.findIndex((s) => s.id === branch.sourceSegmentId);
       if (sourceIdx === -1) continue;
 
-      const branchSegs = visibleSegments.filter((s) => s.branchId === branch.id);
+      const branchSegs = segments.filter((s) => s.branchId === branch.id);
       const branchChain: any[] = [];
       const bVisited = new Set<string>();
       let bCur = branchSegs.find((s) => s.parentSegmentId === branch.sourceSegmentId);
@@ -93,9 +74,9 @@ export async function GET(
       success: true,
       story,
       tree: mainLine,
-      branches: visibleBranches,
-      totalSegments: visibleSegments.length,
-      totalBranches: visibleBranches.length,
+      branches,
+      totalSegments: segments.length,
+      totalBranches: branches.length,
     });
   } catch (error) {
     console.error('获取故事树失败:', error);

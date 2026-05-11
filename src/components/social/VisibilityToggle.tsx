@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useSession } from 'next-auth/react';
 
 interface VisibilityToggleProps {
   currentVisibility: 'PRIVATE' | 'PUBLIC' | 'UNLISTED';
@@ -16,7 +15,6 @@ const visibilityConfig = {
 };
 
 export default function VisibilityToggle({ currentVisibility, on_change, type = 'story' }: VisibilityToggleProps) {
-  const { data: session } = useSession();
   const [open, setOpen] = useState(false);
   const [changing, setChanging] = useState(false);
 
@@ -36,8 +34,7 @@ export default function VisibilityToggle({ currentVisibility, on_change, type = 
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        disabled={!session}
-        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[var(--border)] text-xs transition-colors hover:bg-gray-50 ${!session ? 'opacity-50 cursor-default' : 'cursor-pointer'}`}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[var(--border)] text-xs transition-colors hover:bg-gray-50 cursor-pointer"
       >
         <span>{config.label}</span>
         <span className="text-[var(--muted)]">▾</span>

@@ -27,6 +27,5 @@ export type {
   StorySegment,
   StoryBranch,
   Character,
-  User,
   Visibility,
 } from "@prisma/client";

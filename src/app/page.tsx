@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useSession } from 'next-auth/react';
 import LikeButton from '@/components/social/LikeButton';
 import { STORY_CATEGORY_TABS } from '@/lib/genre-config';
 
@@ -26,17 +25,15 @@ interface Story {
   storyType?: string;
   characterCount?: number;
   visibility?: string;
-  ownerId?: string;
   isLiked?: boolean;
   coverImageUrl?: string;
   _count?: { segments: number; likes: number; comments: number; branches: number };
 }
 
-function StoryCard({ story, index, onDelete, currentUserId }: { story: Story; index: number; onDelete: (id: string) => void; currentUserId?: string }) {
+function StoryCard({ story, index, onDelete }: { story: Story; index: number; onDelete: (id: string) => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [imgError, setImgError] = useState(false);
-  const isOwner = currentUserId && story.ownerId === currentUserId;
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -219,11 +216,9 @@ function LoadingSkeleton() {
 }
 
 export default function Home() {
-  const { data: session, status: sessionStatus } = useSession();
   const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<'all' | 'mine'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
   const handleDeleteStory = (storyId: string) => {
@@ -249,7 +244,7 @@ export default function Home() {
                 fetch(`/api/stories/${story.id}/tree`),
                 fetch(`/api/stories/${story.id}/characters`).catch(() => null),
               ]);
-              
+
               const segmentsData = await segmentsRes.json();
               const treeData = await treeRes.json();
               let characterCount = 0;
@@ -257,12 +252,12 @@ export default function Home() {
                 const charData = await charRes.json();
                 characterCount = Array.isArray(charData) ? charData.length : (charData.characters?.length || 0);
               }
-              
+
               return {
                 ...story,
                 totalSegments: segmentsData.segments?.length || 0,
                 totalBranches: treeData.branches?.length || 0,
-                latestBranch: treeData.branches?.length > 0 
+                latestBranch: treeData.branches?.length > 0
                   ? treeData.branches[treeData.branches.length - 1]
                   : null,
                 characterCount,
@@ -272,7 +267,7 @@ export default function Home() {
             }
           })
         );
-        
+
         setStories(storiesWithDetails);
       } catch (e) {
         setError('加载故事列表失败');
@@ -280,7 +275,7 @@ export default function Home() {
         setLoading(false);
       }
     };
-    
+
     loadStories();
   }, []);
 
@@ -310,22 +305,6 @@ export default function Home() {
         <div className="flex items-center gap-4 mb-4">
           <h2 className="text-2xl font-bold text-[var(--ink)] tracking-wide">故事长卷</h2>
           <div className="flex-1 h-px bg-gradient-to-r from-[var(--border)] to-transparent" />
-          {session?.user && (
-            <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setTab('all')}
-                className={`px-3 py-1 text-sm rounded-md transition-colors ${tab === 'all' ? 'bg-white text-[var(--ink)] shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
-              >
-                全部
-              </button>
-              <button
-                onClick={() => setTab('mine')}
-                className={`px-3 py-1 text-sm rounded-md transition-colors ${tab === 'mine' ? 'bg-white text-[var(--ink)] shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
-              >
-                我的故事
-              </button>
-            </div>
-          )}
         </div>
 
         <div className="flex gap-2 mb-8 overflow-x-auto pb-1">
@@ -363,10 +342,6 @@ export default function Home() {
 
         {!loading && !error && (() => {
           let filtered = stories;
-          // Filter by ownership
-          if (tab === 'mine' && session?.user?.id) {
-            filtered = filtered.filter(s => s.ownerId === session.user.id);
-          }
           // Filter by category (storyType)
           if (categoryFilter !== 'all') {
             filtered = filtered.filter(s => s.storyType === categoryFilter);
@@ -374,13 +349,13 @@ export default function Home() {
           return filtered.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {filtered.map((story, i) => (
-                <StoryCard key={story.id} story={story} index={i} onDelete={handleDeleteStory} currentUserId={session?.user?.id} />
+                <StoryCard key={story.id} story={story} index={i} onDelete={handleDeleteStory} />
               ))}
             </div>
           ) : (
             <div className="text-center py-16">
               <p className="text-4xl mb-4">📜</p>
-              <p className="text-[var(--muted)] mb-4">{tab === 'mine' ? '你还没有创建故事' : '暂无故事，开启你的第一段历史旅程'}</p>
+              <p className="text-[var(--muted)] mb-4">暂无故事，开启你的第一段历史旅程</p>
               <Link href="/create" className="text-[var(--gold)] hover:underline">创建第一个故事 →</Link>
             </div>
           );

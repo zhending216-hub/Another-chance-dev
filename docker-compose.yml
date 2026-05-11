@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: gushi_dev
       POSTGRES_DB: gushi_dev
     ports:
-      - "5433:5432"
+      - "5435:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backups:/app/backups
@@ -26,7 +26,7 @@ services:
       dockerfile: Dockerfile
     container_name: gushi-app
     ports:
-      - "3000:3000"
+      - "3002:3000"
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://gushi:gushi_dev@postgres:5432/gushi_dev
@@ -57,7 +57,7 @@ services:
       dockerfile: Dockerfile.dev
     container_name: gushi-dev
     ports:
-      - "3001:3000"
+      - "3003:3000"
     environment:
       - NODE_ENV=development
       - DATABASE_URL=postgresql://gushi:gushi_dev@postgres:5432/gushi_dev
@@ -89,7 +89,7 @@ services:
     image: redis:7-alpine
     container_name: gushi-redis
     ports:
-      - "6379:6379"
+      - "6381:6379"
     volumes:
       - redis_data:/data
     restart: unless-stopped

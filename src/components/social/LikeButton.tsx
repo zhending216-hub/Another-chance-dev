@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useSession } from 'next-auth/react';
 
 interface LikeButtonProps {
   targetId: string;
@@ -13,7 +12,6 @@ interface LikeButtonProps {
 }
 
 export default function LikeButton({ targetId, storyId, type, initialLiked = false, initialCount = 0, size = 'md' }: LikeButtonProps) {
-  const { data: session } = useSession();
   const [liked, setLiked] = useState(initialLiked);
   const [count, setCount] = useState(initialCount);
   const [loading, setLoading] = useState(false);
@@ -25,7 +23,7 @@ export default function LikeButton({ targetId, storyId, type, initialLiked = fal
   const handleToggle = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!session || loading) return;
+    if (loading) return;
 
     setLoading(true);
     try {
@@ -43,15 +41,15 @@ export default function LikeButton({ targetId, storyId, type, initialLiked = fal
   return (
     <button
       onClick={handleToggle}
-      disabled={!session || loading}
+      disabled={loading}
       className={`inline-flex items-center gap-1 transition-colors ${
         isSmall ? 'text-xs' : 'text-sm'
       } ${
         liked
           ? 'text-red-500 hover:text-red-600'
           : 'text-[var(--muted)] hover:text-red-400'
-      } ${!session ? 'cursor-default opacity-60' : 'cursor-pointer'}`}
-      title={session ? (liked ? '取消点赞' : '点赞') : '登录后可点赞'}
+      } cursor-pointer`}
+      title={liked ? '取消点赞' : '点赞'}
     >
       <span className={liked ? 'scale-110' : ''} style={{ transition: 'transform 0.15s' }}>
         {liked ? '❤️' : '🤍'}

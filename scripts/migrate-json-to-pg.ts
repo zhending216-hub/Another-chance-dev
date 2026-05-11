@@ -40,19 +40,6 @@ interface LegacyBranch {
 async function main() {
   console.log("Starting JSON → PostgreSQL migration...");
 
-  // 0. Ensure system user
-  await prisma.user.upsert({
-    where: { id: "system" },
-    update: {},
-    create: {
-      id: "system",
-      email: "system@localhost",
-      name: "System",
-      passwordHash: "$2a$12$placeholder",
-      isAdmin: true,
-    },
-  });
-
   // 1. Migrate Stories
   const stories = loadJSON<LegacyStory>("stories.json");
   console.log(`Migrating ${stories.length} stories...`);
@@ -66,8 +53,7 @@ async function main() {
         author: s.author || "佚名",
         era: s.era,
         genre: s.genre,
-        ownerId: "system",
-        visibility: "PRIVATE",
+        visibility: "PUBLIC",
         createdAt: new Date(s.createdAt),
         updatedAt: new Date(s.updatedAt),
       },
@@ -96,7 +82,7 @@ async function main() {
         narrativePace: seg.narrativePace,
         mood: seg.mood,
         characterIds: seg.characterIds || [],
-        visibility: "PRIVATE",
+        visibility: "PUBLIC",
         createdAt: new Date(seg.createdAt),
         updatedAt: new Date(seg.updatedAt),
       },
@@ -130,8 +116,7 @@ async function main() {
         userDirection: b.userDirection,
         characterStateSnapshot: b.characterStateSnapshot || undefined,
         forkTimeline: b.forkTimeline || undefined,
-        ownerId: "system",
-        visibility: "PRIVATE",
+        visibility: "PUBLIC",
         createdAt: new Date(b.createdAt),
         updatedAt: new Date(b.updatedAt),
       },

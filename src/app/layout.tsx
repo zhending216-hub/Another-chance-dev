@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import AuthProvider from "@/components/auth-provider";
 import NavHeader from "@/components/nav-header";
 
 export const metadata: Metadata = {
@@ -16,10 +15,8 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body className="min-h-screen">
-        <AuthProvider>
-          <NavHeader />
-          {children}
-        </AuthProvider>
+        <NavHeader />
+        {children}
       </body>
     </html>
   );

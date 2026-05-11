@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getUserIdFromRequest } from '@/lib/auth-helpers';
-import { canViewStory, canCreateBranch } from '@/lib/permissions';
 import { getOrderedChain } from '@/lib/chain-helpers';
-import { characterManager } from '@/lib/character-engine';
 import { buildFullPrompt, correctCharacterNames } from '@/lib/prompt-builder';
 import { callAIText } from '@/lib/ai-client';
 import { triggerBackup } from '@/lib/auto-backup';
@@ -14,11 +11,6 @@ export async function POST(
   { params }: { params: { id: string } },
 ) {
   try {
-    const userId = await getUserIdFromRequest(request);
-    if (!userId) {
-      return NextResponse.json({ error: '请先登录' }, { status: 401 });
-    }
-
     const { id: storyId } = params;
     const { segmentId, userDirection, branchTitle, model, visibility } = await request.json();
 
@@ -28,10 +20,6 @@ export async function POST(
 
     const story = await prisma.story.findUnique({ where: { id: storyId } });
     if (!story) return NextResponse.json({ error: '故事不存在' }, { status: 404 });
-
-    if (!canCreateBranch(story, userId)) {
-      return NextResponse.json({ error: '无权创建分支' }, { status: 403 });
-    }
 
     const currentSegment = await prisma.storySegment.findUnique({ where: { id: segmentId } });
     if (!currentSegment || currentSegment.storyId !== storyId) {
@@ -43,6 +31,7 @@ export async function POST(
     // Snapshot character states
     let characterStateSnapshot: any = undefined;
     try {
+      const { characterManager } = await import('@/lib/character-engine');
       characterStateSnapshot = await characterManager.snapshotCharacterStates(storyId, 'main', segmentId);
     } catch (e) {
       console.warn('[branch] 角色快照失败:', e);
@@ -57,8 +46,7 @@ export async function POST(
         storyId,
         userDirection,
         characterStateSnapshot,
-        ownerId: userId,
-        visibility: visibility || 'PRIVATE',
+        visibility: visibility || 'PUBLIC',
         model: model || null,
       },
     });
@@ -107,13 +95,14 @@ export async function POST(
         branchId,
         parentSegmentId: segmentId,
         imageUrls: [],
-        visibility: 'PRIVATE',
+        visibility: 'PUBLIC',
       },
     });
 
     // Discover and register characters in the generated content
     let mentionedIds: string[] = [];
     try {
+      const { characterManager } = await import('@/lib/character-engine');
       const mentioned = await characterManager.discoverAndRegisterCharacters(
         storyId,
         aiContent,

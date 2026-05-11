@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getUserIdFromRequest } from '@/lib/auth-helpers';
-import { canEditBranch, canViewStory } from '@/lib/permissions';
 import { triggerBackup } from '@/lib/auto-backup';
 
 export async function PATCH(
@@ -9,9 +7,6 @@ export async function PATCH(
   { params }: { params: { id: string; branchId: string } },
 ) {
   try {
-    const userId = await getUserIdFromRequest(request);
-    if (!userId) return NextResponse.json({ error: '请先登录' }, { status: 401 });
-
     const { id: storyId, branchId } = params;
     const { visibility } = await request.json();
 
@@ -25,10 +20,6 @@ export async function PATCH(
     const branch = await prisma.storyBranch.findUnique({ where: { id: branchId } });
     if (!branch || branch.storyId !== storyId) {
       return NextResponse.json({ error: '分支不存在' }, { status: 404 });
-    }
-
-    if (!canEditBranch(branch, userId)) {
-      return NextResponse.json({ error: '无权修改分支' }, { status: 403 });
     }
 
     // Cannot publish branch if parent story is private
@@ -54,11 +45,6 @@ export async function DELETE(
   { params }: { params: { id: string; branchId: string } },
 ) {
   try {
-    const userId = await getUserIdFromRequest(request);
-    if (!userId) {
-      return NextResponse.json({ error: '请先登录' }, { status: 401 });
-    }
-
     const { id: storyId, branchId } = params;
 
     if (!storyId || !branchId) {
@@ -75,10 +61,6 @@ export async function DELETE(
     const targetBranch = await prisma.storyBranch.findUnique({ where: { id: branchId } });
     if (!targetBranch || targetBranch.storyId !== storyId) {
       return NextResponse.json({ error: '分支不存在' }, { status: 404 });
-    }
-
-    if (!canEditBranch(targetBranch, userId)) {
-      return NextResponse.json({ error: '无权删除分支' }, { status: 403 });
     }
 
     // Collect all branches to delete (recursive)

@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getUserIdFromRequest } from '@/lib/auth-helpers';
-import { canViewStory } from '@/lib/permissions';
 import { getOrderedChain } from '@/lib/chain-helpers';
 import { callAIText, extractJsonFromAI } from '@/lib/ai-client';
 import { characterManager } from '@/lib/character-engine';
@@ -11,11 +9,6 @@ export async function POST(
   { params }: { params: { id: string } },
 ) {
   try {
-    const userId = await getUserIdFromRequest(request);
-    if (!userId) {
-      return NextResponse.json({ suggestions: [] });
-    }
-
     const { id: storyId } = params;
     const { segmentId, branchId } = await request.json();
     if (!storyId || !segmentId) {
@@ -23,7 +16,7 @@ export async function POST(
     }
 
     const story = await prisma.story.findUnique({ where: { id: storyId } });
-    if (!story || !canViewStory(story, userId)) {
+    if (!story) {
       return NextResponse.json({ suggestions: [] });
     }
 

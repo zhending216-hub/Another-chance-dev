@@ -1,4 +1,4 @@
-import type { Story, StoryBranch, StorySegment, Visibility, User } from "@/lib/prisma";
+import type { Story, StoryBranch, StorySegment, Visibility } from "@/lib/prisma";
 
 // --- Permission types ---
 
