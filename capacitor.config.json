@@ -1,0 +1,27 @@
+{
+  "appId": "com.gushi.mobile",
+  "appName": "古事",
+  "webDir": "out",
+  "server": {
+    "url": "http://10.6.8.91:3000",
+    "cleartext": true,
+    "androidScheme": "http"
+  },
+  "android": {
+    "minSdkVersion": 24,
+    "allowMixedContent": true,
+    "webContentsDebuggingEnabled": true
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "dark",
+      "backgroundColor": "#1a1a2e"
+    },
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "androidScaleType": "CENTER_CROP",
+      "splashFullScreen": true,
+      "splashImmersive": true
+    }
+  }
+}

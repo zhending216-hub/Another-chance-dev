@@ -1,0 +1,233 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========== 枚举 ==========
+
+enum Visibility {
+  PRIVATE
+  PUBLIC
+  UNLISTED
+}
+
+// ========== 业务模型 ==========
+
+model Story {
+  id            String     @id @default(cuid())
+  title         String
+  description   String?
+  author        String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  rootSegmentId String?  @unique
+  era           String?
+  genre         String?
+  storyType     String?
+
+  coverImageUrl String?
+
+  visibility    Visibility @default(PRIVATE)
+  publishedAt   DateTime?
+
+  segments      StorySegment[]
+  branches      StoryBranch[]
+  characters    Character[]
+  rootSegment   StorySegment?  @relation("StoryRoot", fields: [rootSegmentId], references: [id])
+  directorStates DirectorState[]
+  events        KeyEvent[]
+  likes         StoryLike[]
+  comments      Comment[]
+
+  @@index([visibility, publishedAt])
+  @@map("stories")
+}
+
+model StorySegment {
+  id                  String     @id @default(cuid())
+  title               String?
+  content             String     @db.Text
+  isBranchPoint       Boolean    @default(false)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  storyId             String
+  story               Story      @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  branchId            String
+  parentSegmentId     String?
+  imageUrls           String[]   @default([])
+  timeline            Json?
+  historicalReferences Json?
+  narrativePace       String?
+  mood                String?
+  characterIds        String[]   @default([])
+  visibility          Visibility @default(PRIVATE)
+
+  // 反向关联
+  rootOfStory         Story?          @relation("StoryRoot")
+  branchSourceOf      StoryBranch[]   @relation("BranchSource")
+
+  summaries           SegmentSummary[]
+
+  @@index([storyId, branchId])
+  @@index([storyId])
+  @@index([branchId])
+  @@map("story_segments")
+}
+
+model StoryBranch {
+  id                     String     @id @default(cuid())
+  title                  String
+  description            String?
+  sourceSegmentId        String
+  storyId                String
+  userDirection          String
+  characterStateSnapshot Json?
+  forkTimeline           Json?
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+
+  visibility             Visibility @default(PRIVATE)
+
+  story                  Story        @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  sourceSegment          StorySegment @relation("BranchSource", fields: [sourceSegmentId], references: [id])
+
+  model                  String?   // AI model used for fork generation
+  likes                  StoryLike[]
+  comments               Comment[]
+
+  @@index([storyId])
+  @@index([visibility])
+  @@map("story_branches")
+}
+
+model Character {
+  id             String   @id @default(cuid())
+  name           String
+  era            String
+  role           String   @default("supporting")
+  speechPatterns String   @default("")
+  coreMotivation String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  traits         Json     @default("[]")
+  relationships  Json     @default("[]")
+  stateHistory   Json     @default("[]")
+  appearance     String?  @default("")
+  canonicalName  String?  @default("")
+
+  storyId        String
+  story          Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  @@index([storyId])
+  @@map("characters")
+}
+
+model DirectorState {
+  id                String   @id @default(cuid())
+  storyId           String   @unique
+  story             Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  characterStates   Json     @default("{}")
+  worldVariables    Json     @default("{}")
+  activeConstraints Json     @default("[]")
+  updatedAt         DateTime @updatedAt
+
+  @@map("director_states")
+}
+
+model SegmentSummary {
+  id          String       @id @default(cuid())
+  segmentId   String
+  storyId     String
+  branchId    String
+  chainIndex  Int          @default(0)
+  summary     String       @db.Text
+  tokenCount  Int?
+  originalTokenCount Int?
+  aiGenerated Boolean      @default(false)
+  metadata    Json?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  segment     StorySegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+
+  @@unique([segmentId, branchId])
+  @@index([storyId, branchId])
+  @@map("segment_summaries")
+}
+
+model KeyEvent {
+  id                    String   @id @default(cuid())
+  storyId               String
+  story                 Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  branchId              String
+  segmentId             String?
+  eventType             String
+  description           String   @db.Text
+  era                   String?
+  year                  Int?
+  season                String?
+  narrativeTime         String?
+  status                String   @default("active")
+  importance            String   @default("major")
+  involvedCharacterIds  Json     @default("[]")
+  resolvedBySegmentId   String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([storyId])
+  @@index([storyId, branchId])
+  @@map("key_events")
+}
+
+// ========== 社交功能模型 ==========
+
+model StoryLike {
+  id        String   @id @default(cuid())
+  storyId   String?
+  branchId  String?
+  createdAt DateTime @default(now())
+
+  story  Story?        @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  branch StoryBranch?  @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@index([storyId])
+  @@index([branchId])
+  @@map("story_likes")
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  storyId   String?
+  branchId  String?
+  parentId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  story    Story?         @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  branch   StoryBranch?   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  parent   Comment?       @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  Comment[]      @relation("CommentReplies")
+  likes    CommentLike[]
+
+  @@index([storyId, createdAt])
+  @@index([branchId, createdAt])
+  @@index([parentId])
+  @@map("comments")
+}
+
+model CommentLike {
+  id        String   @id @default(cuid())
+  commentId String
+  createdAt DateTime @default(now())
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([commentId])
+  @@map("comment_likes")
+}
