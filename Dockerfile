@@ -69,7 +69,8 @@ COPY --from=builder /app/package.json ./package.json
 
 # 复制 standalone 模式遗漏的运行时依赖
 # 这些包被服务端代码使用但 Next.js standalone 没有自动包含
-COPY --from=builder /app/node_modules/@prisma/adapter-pg ./node_modules/@prisma/adapter-pg
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/zod ./node_modules/zod
 
 # 创建数据目录并授权
